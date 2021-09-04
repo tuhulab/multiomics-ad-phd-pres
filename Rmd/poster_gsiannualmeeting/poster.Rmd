@@ -2,33 +2,49 @@
 title: Multi-omics Deep Phenotyping of Atopic Dermatitis in Time and Space
 author:
   - name: Tu Hu
-    affil: 1,2
-    github: tuhulab
-    email: tu.hu.ucph@gmail.com
-    orcid: 0000-0002-4635-4117
+    affil: 1, 2
+    email: UYHDK@leo-pharma.com
     main: true
+  - name: Tanja Todberg
+    affil: 3
+  - name: Joel Correa da Rosa
+    affil: 4
+  - name: Lone Skov
+    affil: 3
+  - name: Thomas Litman
+    affil: 1, 2
 affiliation:
   - num: 1
-    address: LEO Pharma
+    address: Explorative Biology and Bioinformatics, Skin Research, LEO Pharma
   - num: 2
     address: Department of Immunology and Microbiology, University of Copenhagen
+  - num: 3
+    address: Dermatology and Allergy, Herlev and Gentofte Hospital 
+  - num: 4
+    address: Laboratory of Inflammtory Skin Diseases, Icahn School of Medicine at Mount Sinai
+    
 main_findings:
-  - "Atopic Dermatitis patients show common but also diverse features in the multi-omics space."
-  - '![](https://raw.githubusercontent.com/brentthorne/posterdown/master/images/betterhexlogo.png){.main_pic}'
+  - "Atopic dermatitis patients show common but also diverse features in the multi-omics space."
+  - '![](heatmap.png){.main_pic}'
 logoleft_name: '![](https://raw.githubusercontent.com/brentthorne/posterdown/master/images/qr-code-black.png){.main-img-left}'
 logoright_name: '![](https://raw.githubusercontent.com/brentthorne/posterdown/master/images/betterhexlogo.png){.main-img-right}'
 title_textsize: "95pt"
+body_textsize: "42px"
+font_family: "Rasa"
+# primary_colour: "#204131"
+
+
 output: 
   posterdown::posterdown_betterland:
     self_contained: false
     pandoc_args: --mathjax
-    highlight: haddock
+    highlight: espresso
     number_sections: false
 link-citations: true
 bibliography: packages.bib
 ---
 
-```{r, include=FALSE}
+```{r set up, include=FALSE}
 knitr::opts_chunk$set(results = 'asis',
                       echo = FALSE,
                       warning = FALSE,
@@ -37,6 +53,15 @@ knitr::opts_chunk$set(results = 'asis',
                       fig.align = 'center',
                       out.width = "100%")
 options(knitr.table.format = "html") 
+library(dplyr)
+library(MuSiC)
+library(Biobase)
+library(convert)
+library(SummarizedExperiment)
+library(tidyr)
+library(tibble)
+library(ggpubr)
+
 ```
 
 ```{r myplot, include=FALSE}
@@ -47,33 +72,124 @@ dev.off()
 
 # Introduction
 
-- Atopic dermatitis (AD) is a common inflammatory skin disorder. 
-
-- We performed a **multi-omics** analysis to gain a deeper understanding of AD pathophysiology.
+Atopic dermatitis (AD) is a common inflammatory skin disorder. We performed a **multi-omics** analysis to gain a deeper understanding of AD pathophysiology.
 
 # Methods
+
 ```{r dpi=450}
 knitr::include_graphics("fig-study-design.png")
 ```
 
-Phenome: a physician-led 106-item questionnaire, including lifestyle, family and history disease
+We profiled the **genome** using SNP genotyping, **transcriptome** using RNA-seq from 1.5 mm punch skin biopsies, **metabolome** using LC-MS from urine and serum, **microbiome** using 16S rRNA sequencing from skin swabs, and **phenome** by a 106-item questionnaire in addition to clinical tests.
 
-Genome: SNP array
+# Results
 
-Transcriptome: AD lesional and non-lesional ; tape striping
+SNP genotyping identified FLG mutation (rs34806697) as the most discriminating genetic factor between AD and CO. The AD skin transcriptome comprised \>1600 genes, enriched for epidermal differentiation and cytokine and chemokine induced inflammation. When evaluating the stability of the AD signature, we found that individual and technical factors were dominating, followed by variations in time and space. Metabolomics profiling did not identify any serum biomarkers that could distinguish AD from CO, while the urine metabolome suggests that AD subjects live a healthier lifestyle than CO. The microbiome of AD skin showed less diversity and higher abundance of *Staphylococcus aureus* compared with CO. In conclusion, AD patients show common but also diverse features in the multi-omics space.
 
-Proteome: Sciomics from blood
 
-Metabolome: LC-MS based profiling from serum and urine
 
-Microbiome: 16S rRNA from nose and skin swabs
 
-# Abstract
+### Baseline
+```{r Phenome}
+extensive_meta <- 
+  readr::read_csv("../../../multiomics-ad-transcriptomics/data/RNAseq_sample_annotation(extensive).csv")
 
-of 30 AD and 30 healthy control (CO) subjects, of which a sub-group was followed for up to one year. We profiled the genome using SNP genotyping, transcriptome using RNA-seq from 1.5 mm punch skin biopsies, metabolome using LC-MS from urine and serum, microbiome using 16S rRNA sequencing from skin swabs, and phenome by a 106-item questionnaire in addition to clinical tests. SNP genotyping identified FLG mutation (rs34806697) as the most discriminating genetic factor between AD and CO. The AD skin transcriptome comprised >1600 genes, enriched for epidermal differentiation and cytokine and chemokine induced inflammation. When evaluating the stability of the AD signature, we found that individual and technical factors were dominating, followed by variations in time and space. Metabolomics profiling did not identify any serum biomarkers that could distinguish AD from CO, while the urine metabolome suggests that AD subjects live a healthier lifestyle than CO. The microbiome of AD skin showed less diversity and higher abundance of Staphylococcus aureus compared with CO. In conclusion, AD patients show common but also diverse features in the multi-omics space.
+baseline_data <-  
+  extensive_meta %>% filter(visit == "01") %>% 
+  select(subject, age, bmi, blood_ige, gender, group, easi_total_score, scorad, scorad_objective) %>% 
+  distinct()
+  
+clinic_summary <- 
+ baseline_data %>% select(-subject) %>% group_by(group) %>% 
+  summarize(no_subject = n(),
+            female_percent = mean(gender == "female") * 100,
+            age_mean = mean(age), age_sd = sd(age), 
+            bmi_mean = mean(bmi), bmi_sd = sd(bmi), 
+            blood_ige_mean = mean(blood_ige, na.rm = TRUE), blood_ige_sd = sd(blood_ige, na.rm = TRUE), 
+            easi_mean = mean(easi_total_score), easi_sd = sd(easi_total_score), 
+            scorad_mean = mean(scorad, na.rm = TRUE), scorad_sd = sd(scorad, na.rm = TRUE),
+            oscorad_mean = mean(scorad_objective, na.rm = TRUE), 
+            oscorad_sd = sd(scorad_objective, na.rm = TRUE),
+            ige_mean = mean(blood_ige, na.rm = TRUE), 
+            ige_sd = sd(blood_ige, na.rm = TRUE),
+            ige_median = median(blood_ige, na.rm = TRUE),
+            ige_250_h = sum(blood_ige > 250, na.rm = TRUE))
 
-```{r, include=FALSE}
-knitr::write_bib(c('posterdown', 'rmarkdown','pagedown'), 'packages.bib')
+p_value <- 
+  tibble(
+    age = t.test(x = baseline_data %>% filter(group == "AD") %>% select(age),
+                 y = baseline_data %>% filter(group == "CO") %>% select(age))$p.value,
+    bmi = t.test(x = baseline_data %>% filter(group == "AD") %>% select(bmi),
+                 y = baseline_data %>% filter(group == "CO") %>% select(bmi))$p.value,
+    ige = t.test(x = baseline_data %>% filter(group == "AD") %>% select(blood_ige),
+                 y = baseline_data %>% filter(group == "CO") %>% select(blood_ige))$p.value,
+    gender = baseline_data %>% select(gender, group) %>% table %>% fisher.test() %>% broom::tidy() %>% pull(p.value)
+) %>% mutate_all(round, digits = 2)
+
+```
+
+|Characteristics |Patients(n=`r clinic_summary %>% filter(group == "AD") %>% pull(no_subject)`)|Controls(n=`r clinic_summary %>% filter(group == "CO") %>% pull(no_subject)`) | p-value|
+|-----------------------------:|---------------------------------------------------------------------:|----------------------------------------------------------------------------------------------------------------------------------------------------------------------:|--------------------:|
+|                   Female (%) |                                                                                    `r clinic_summary %>% filter(group == "AD") %>% pull(female_percent) %>% round(2)` |                                                                                    `r clinic_summary %>% filter(group == "CO") %>% pull(female_percent) %>% round(2)` | `r p_value$gender` |
+| Age at enrollment|             `r clinic_summary %>% filter(group == "AD") %>% pull(age_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(age_sd) %>% round(2)` |             `r clinic_summary %>% filter(group == "CO") %>% pull(age_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "CO") %>% pull(age_sd) %>% round(2)` | `r p_value$age`    |
+|               BMI|             `r clinic_summary %>% filter(group == "AD") %>% pull(bmi_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(bmi_sd) %>% round(2)` |             `r clinic_summary %>% filter(group == "CO") %>% pull(bmi_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "CO") %>% pull(bmi_sd) %>% round(2)` | `r p_value$bmi`    |
+|         serum IgE| `r clinic_summary %>% filter(group == "AD") %>% pull(blood_ige_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(blood_ige_sd) %>% round(2)` | `r clinic_summary %>% filter(group == "CO") %>% pull(blood_ige_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "CO") %>% pull(blood_ige_sd) %>% round(2)` | `r p_value$ige`    |
+|              EASI|           `r clinic_summary %>% filter(group == "AD") %>% pull(easi_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(easi_sd) %>% round(2)` |                                                                                                                                                                    \- | \-                 |
+|            SCORAD|       `r clinic_summary %>% filter(group == "AD") %>% pull(scorad_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(scorad_sd) %>% round(2)` |                                                                                                                                                                    \- | \-                 |
+|           oSCORAD|     `r clinic_summary %>% filter(group == "AD") %>% pull(oscorad_mean) %>% round(2)` ± `r clinic_summary %>% filter(group == "AD") %>% pull(oscorad_sd) %>% round(2)` |                                                                                                                                                                    \- | \-                 |
+
+### Variance Parition
+
+```{r VP}
+
+```
+
+### Cell type deconvolution
+```{r cell deconvolution, cache=TRUE}
+se <- readr::read_rds("../../../multiomics-ad-phd/data/se.rds")
+se_scaled <- se
+assay(se_scaled) <- NULL
+multiomics <- 
+  as(se_scaled, "ExpressionSet")
+emma_guttman <- readRDS(
+  url("https://gitcdn.link/repo/tuhulab/cell-type-deconvolute/main/data/emma-gutmann/ExpressionSet.rds"))
+multiomics_music <- music_prop(bulk.eset = multiomics, sc.eset = emma_guttman,
+                               clusters = "cell_type", samples = "sample_name")
+multiomics_results <-
+  data.matrix(multiomics_music$Est.prop.weighted) %>% 
+  as.data.frame() %>% rownames_to_column("BAM_ID") %>% 
+  pivot_longer(!BAM_ID, names_to = "cell_type", values_to = "prop") %>% 
+  left_join(colData(se_scaled) %>% as_tibble() %>% select(BAM_ID, group, subject, visit, skin_type, replicate_ID, gender, scorad, scorad_objective, easi_total_score, date_visit, rna_quality, visit_quarter, biopsy_area))
+cell_type_rank <- 
+  multiomics_results %>% group_by(cell_type) %>% 
+  summarize(mean_prop = mean(prop)) %>% arrange(-mean_prop) %>% pull(cell_type)
+exclude_low_KRT <-
+  multiomics_results %>% 
+  filter(cell_type == "Keratinocytes", prop < .11) %>% pull(BAM_ID)
+multiomics_results <-
+  multiomics_results %>% filter(!BAM_ID %in% exclude_low_KRT) %>% 
+  mutate(cell_type = forcats::fct_relevel(cell_type, cell_type_rank),
+         prop = prop * 100)
+```
+
+```{r cell deconvolution vis}
+multiomics_results_twosamples <- 
+  multiomics_results %>%
+  filter(subject %in% c("AD_16", "CO_33")) %>% 
+  ggbarplot(x = "replicate_ID", y = "prop", fill = "cell_type", 
+            facet.by = c("skin_type", "visit"),
+            panel.labs = list(visit = c("Visit 1", "Visit 2", "Visit 3", "Visit 4", "Visit 5"), 
+                              skin_type = c("CO33-NN", "AD16-NL", "AD16-LS")),
+            xlab = "Replicate", ylab = "Proportion(%)") +
+  fill_palette("npg")
+multiomics_results_vis_two_sample <- 
+  multiomics_results_twosamples %>% 
+  ggpar(legend = "bottom", 
+        legend.title = "Cell type",
+        font.legend = 7, 
+        font.tickslab = 6, 
+        main = "Cell Deconvolution for two subjects (AD_16 and CO_33)", rotate = TRUE)
+multiomics_results_vis_two_sample
 ```
 
 
